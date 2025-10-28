@@ -96,39 +96,39 @@ sealed class JellyfinMediaSource(
             }
         }
 
-        name = item?.let { it ->
+        name = item?.let {
             buildString {
-                val name = if(
-                    (it.type == BaseItemKind.PROGRAM || it.type == BaseItemKind.RECORDING)
-                        && (it.isSeries == true || !it.episodeTitle.isNullOrEmpty())
-                ) it.episodeTitle else it.name
+                val name = if (
+                    it.type in arrayOf(BaseItemKind.PROGRAM, BaseItemKind.RECORDING) &&
+                    (it.isSeries == true || !it.episodeTitle.isNullOrEmpty())
+                ) { it.episodeTitle } else { it.name }
 
                 val extraInfo = when {
                     it.type == BaseItemKind.TV_CHANNEL && !it.channelNumber.isNullOrEmpty() -> it.channelNumber
-                    it.type == BaseItemKind.EPISODE && it.parentIndexNumber == 0 -> "Special" //TODO: add localization
-                    (it.type == BaseItemKind.EPISODE || it.type == BaseItemKind.RECORDING)
-                        && it.indexNumber != null && it.parentIndexNumber != null ->
-                        "S${it.parentIndexNumber}:E${it.indexNumber}${it.indexNumberEnd?.let { "-${it}" } ?: ""}"
+                    it.type == BaseItemKind.EPISODE && it.parentIndexNumber == 0 -> "Special" // TODO: add localization
+                    it.type in arrayOf(BaseItemKind.EPISODE, BaseItemKind.RECORDING) &&
+                        it.indexNumber != null && it.parentIndexNumber != null ->
+                        "S${it.parentIndexNumber}:E${it.indexNumber}${it.indexNumberEnd?.let { n -> "-$n" } ?: ""}"
                     else -> ""
                 }
 
                 val separator = " - "
 
-                if(!it.seriesName.isNullOrEmpty()) {
+                if (!it.seriesName.isNullOrEmpty()) {
                     append(it.seriesName)
-                    if(!name.isNullOrEmpty() || !extraInfo.isNullOrEmpty()) append(separator)
+                    if (!name.isNullOrEmpty() || !extraInfo.isNullOrEmpty()) append(separator)
                 }
 
-                if(!extraInfo.isNullOrEmpty()) {
+                if (!extraInfo.isNullOrEmpty()) {
                     append(extraInfo)
-                    if(!name.isNullOrEmpty()) append(separator)
+                    if (!name.isNullOrEmpty()) append(separator)
                 }
 
                 append(name.orEmpty())
 
-                if(it.type == BaseItemKind.MOVIE && it.productionYear != null) {
+                if (it.type == BaseItemKind.MOVIE && it.productionYear != null) {
                     append(" (${it.productionYear})")
-                } else if(it.premiereDate != null) {
+                } else if (it.premiereDate != null) {
                     append(" (${it.premiereDate!!.year})")
                 }
             }.ifEmpty { null }
