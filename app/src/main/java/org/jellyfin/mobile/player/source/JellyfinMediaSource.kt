@@ -1,5 +1,7 @@
 package org.jellyfin.mobile.player.source
 
+import org.jellyfin.mobile.JellyfinApplication
+import org.jellyfin.mobile.R
 import org.jellyfin.mobile.player.deviceprofile.CodecHelpers
 import org.jellyfin.mobile.utils.Constants
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -103,9 +105,10 @@ sealed class JellyfinMediaSource(
                     (it.isSeries == true || !it.episodeTitle.isNullOrEmpty())
                 ) { it.episodeTitle } else { it.name }
 
+                val specialEpisode = JellyfinApplication.getInstance()?.getString(R.string.special_episode)
                 val extraInfo = when {
                     it.type == BaseItemKind.TV_CHANNEL && !it.channelNumber.isNullOrEmpty() -> it.channelNumber
-                    it.type == BaseItemKind.EPISODE && it.parentIndexNumber == 0 -> "Special" // TODO: add localization
+                    it.type == BaseItemKind.EPISODE && it.parentIndexNumber == 0 -> specialEpisode
                     it.type in arrayOf(BaseItemKind.EPISODE, BaseItemKind.RECORDING) &&
                         it.indexNumber != null && it.parentIndexNumber != null ->
                         "S${it.parentIndexNumber}:E${it.indexNumber}${it.indexNumberEnd?.let { n -> "-$n" } ?: ""}"
