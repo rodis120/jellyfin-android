@@ -11,22 +11,11 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.fragment.koin.fragmentFactory
 import org.koin.core.context.startKoin
 import timber.log.Timber
-import java.lang.ref.WeakReference
 
 @Suppress("unused")
 class JellyfinApplication : Application() {
-
-    companion object {
-
-        @Volatile
-        private var instance: WeakReference<JellyfinApplication>? = null
-
-        fun getInstance() = instance?.get()
-    }
-
     override fun onCreate() {
         super.onCreate()
-        instance = WeakReference(this)
 
         // Setup logging
         Timber.plant(JellyTree())

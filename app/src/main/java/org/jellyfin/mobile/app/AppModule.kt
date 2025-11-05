@@ -86,7 +86,7 @@ val applicationModule = module {
     single { ConnectionHelper(get(), get()) }
 
     // Media player helpers
-    single { MediaSourceResolver(get()) }
+    single { MediaSourceResolver(get(), get()) }
     single { DeviceProfileBuilder(get()) }
     single { QualityOptionsProvider() }
     single { MediaSegmentRepository() }

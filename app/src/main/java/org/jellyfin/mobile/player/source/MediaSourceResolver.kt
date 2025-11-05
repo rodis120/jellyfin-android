@@ -1,5 +1,7 @@
 package org.jellyfin.mobile.player.source
 
+import android.content.Context
+import org.jellyfin.mobile.R
 import org.jellyfin.mobile.player.PlayerException
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.exception.ApiClientException
@@ -7,6 +9,8 @@ import org.jellyfin.sdk.api.client.extensions.mediaInfoApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.api.operations.MediaInfoApi
 import org.jellyfin.sdk.api.operations.UserLibraryApi
+import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.DeviceProfile
 import org.jellyfin.sdk.model.api.MediaSourceInfo
 import org.jellyfin.sdk.model.api.PlaybackInfoDto
@@ -16,7 +20,7 @@ import timber.log.Timber
 import java.util.UUID
 import kotlin.time.Duration
 
-class MediaSourceResolver(private val apiClient: ApiClient) {
+class MediaSourceResolver(private val apiClient: ApiClient, private val context: Context) {
     private val mediaInfoApi: MediaInfoApi = apiClient.mediaInfoApi
     private val userLibraryApi: UserLibraryApi = apiClient.userLibraryApi
 
@@ -71,11 +75,13 @@ class MediaSourceResolver(private val apiClient: ApiClient) {
 
         // Create JellyfinMediaSource
         return try {
+            val name: String = item?.let { getItemName(it) } ?: mediaSourceInfo.name.orEmpty()
             val source = RemoteJellyfinMediaSource(
                 itemId = itemId,
                 item = item,
                 sourceInfo = mediaSourceInfo,
                 playSessionId = playSessionId,
+                name = name,
                 liveStreamId = mediaSourceInfo.liveStreamId,
                 maxStreamingBitrate = maxStreamingBitrate,
                 playbackDetails = PlaybackDetails(startTime, audioStreamIndex, subtitleStreamIndex),
@@ -85,5 +91,45 @@ class MediaSourceResolver(private val apiClient: ApiClient) {
             Timber.e(e, "Cannot create JellyfinMediaSource")
             Result.failure(PlayerException.UnsupportedContent(e))
         }
+    }
+
+    @Suppress("CyclomaticComplexMethod")
+    private fun getItemName(item: BaseItemDto): String? {
+        return buildString {
+            val name = if (
+                item.type in arrayOf(BaseItemKind.PROGRAM, BaseItemKind.RECORDING) &&
+                (item.isSeries == true || !item.episodeTitle.isNullOrEmpty())
+            ) { item.episodeTitle } else { item.name }
+
+            val specialEpisode = context.getString(R.string.special_episode)
+            val extraInfo = when {
+                item.type == BaseItemKind.TV_CHANNEL && !item.channelNumber.isNullOrEmpty() -> item.channelNumber
+                item.type == BaseItemKind.EPISODE && item.parentIndexNumber == 0 -> specialEpisode
+                item.type in arrayOf(BaseItemKind.EPISODE, BaseItemKind.RECORDING) &&
+                    item.indexNumber != null && item.parentIndexNumber != null ->
+                    "S${item.parentIndexNumber}:E${item.indexNumber}${item.indexNumberEnd?.let { n -> "-$n" } ?: ""}"
+                else -> ""
+            }
+
+            val separator = " - "
+
+            if (!item.seriesName.isNullOrEmpty()) {
+                append(item.seriesName)
+                if (!name.isNullOrEmpty() || !extraInfo.isNullOrEmpty()) append(separator)
+            }
+
+            if (!extraInfo.isNullOrEmpty()) {
+                append(extraInfo)
+                if (!name.isNullOrEmpty()) append(separator)
+            }
+
+            append(name.orEmpty())
+
+            if (item.type == BaseItemKind.MOVIE && item.productionYear != null) {
+                append(" (${item.productionYear})")
+            } else if (item.premiereDate != null) {
+                append(" (${item.premiereDate!!.year})")
+            }
+        }.ifEmpty { null }
     }
 }

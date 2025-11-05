@@ -26,6 +26,7 @@ class JellyfinMediaSourceSerializer : KSerializer<LocalJellyfinMediaSource> {
         element<String>("downloadFolderUri")
         element<String>("downloadedFileUri")
         element<Long>("downloadSize")
+        element<String>("name")
     }
 
     @SuppressWarnings("MagicNumber")
@@ -38,6 +39,7 @@ class JellyfinMediaSourceSerializer : KSerializer<LocalJellyfinMediaSource> {
             encodeStringElement(descriptor, 4, value.localDirectoryUri)
             encodeStringElement(descriptor, 5, value.remoteFileUri)
             encodeLongElement(descriptor, 6, value.downloadSize)
+            encodeStringElement(descriptor, 7, value.name)
         }
 
     @SuppressWarnings("MagicNumber")
@@ -50,6 +52,7 @@ class JellyfinMediaSourceSerializer : KSerializer<LocalJellyfinMediaSource> {
             var downloadFolderUri: String? = null
             var downloadedFileUri: String? = null
             var downloadSize: Long? = null
+            var name: String? = null
 
             while (true) {
                 when (val index = decodeElementIndex(descriptor)) {
@@ -60,6 +63,7 @@ class JellyfinMediaSourceSerializer : KSerializer<LocalJellyfinMediaSource> {
                     4 -> downloadFolderUri = decodeStringElement(descriptor, 4)
                     5 -> downloadedFileUri = decodeStringElement(descriptor, 5)
                     6 -> downloadSize = decodeLongElement(descriptor, 6)
+                    7 -> name = decodeStringElement(descriptor, 7)
                     CompositeDecoder.DECODE_DONE -> break
                     else -> throw SerializationException("Unknown index $index")
                 }
@@ -70,6 +74,7 @@ class JellyfinMediaSourceSerializer : KSerializer<LocalJellyfinMediaSource> {
                 item = item,
                 sourceInfo = requireNotNull(sourceInfo) { "Media source has no source info" },
                 playSessionId = requireNotNull(playSessionId) { "Media source has no play session id" },
+                name = name ?: sourceInfo.name.orEmpty(),
                 localDirectoryUri = requireNotNull(downloadFolderUri) { "Media source has no download folder uri" },
                 remoteFileUri = requireNotNull(downloadedFileUri) { "Media source has no downloaded file uri" },
                 downloadSize = requireNotNull(downloadSize) { "Media source has no download size" },
