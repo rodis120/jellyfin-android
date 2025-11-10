@@ -1,6 +1,6 @@
 package org.jellyfin.mobile.player.source
 
-import org.jellyfin.mobile.JellyfinApplication
+import android.content.Context
 import org.jellyfin.mobile.R
 import org.jellyfin.mobile.player.deviceprofile.CodecHelpers
 import org.jellyfin.mobile.utils.Constants
@@ -23,7 +23,6 @@ sealed class JellyfinMediaSource(
     playbackDetails: PlaybackDetails?,
 ) {
     val id: String = requireNotNull(sourceInfo.id) { "Media source has no id" }
-    val name: String
 
     abstract val playMethod: PlayMethod
 
@@ -98,45 +97,6 @@ sealed class JellyfinMediaSource(
             }
         }
 
-        name = item?.let {
-            buildString {
-                val name = if (
-                    it.type in arrayOf(BaseItemKind.PROGRAM, BaseItemKind.RECORDING) &&
-                    (it.isSeries == true || !it.episodeTitle.isNullOrEmpty())
-                ) { it.episodeTitle } else { it.name }
-
-                val specialEpisode = JellyfinApplication.getInstance()?.getString(R.string.special_episode)
-                val extraInfo = when {
-                    it.type == BaseItemKind.TV_CHANNEL && !it.channelNumber.isNullOrEmpty() -> it.channelNumber
-                    it.type == BaseItemKind.EPISODE && it.parentIndexNumber == 0 -> specialEpisode
-                    it.type in arrayOf(BaseItemKind.EPISODE, BaseItemKind.RECORDING) &&
-                        it.indexNumber != null && it.parentIndexNumber != null ->
-                        "S${it.parentIndexNumber}:E${it.indexNumber}${it.indexNumberEnd?.let { n -> "-$n" } ?: ""}"
-                    else -> ""
-                }
-
-                val separator = " - "
-
-                if (!it.seriesName.isNullOrEmpty()) {
-                    append(it.seriesName)
-                    if (!name.isNullOrEmpty() || !extraInfo.isNullOrEmpty()) append(separator)
-                }
-
-                if (!extraInfo.isNullOrEmpty()) {
-                    append(extraInfo)
-                    if (!name.isNullOrEmpty()) append(separator)
-                }
-
-                append(name.orEmpty())
-
-                if (it.type == BaseItemKind.MOVIE && it.productionYear != null) {
-                    append(" (${it.productionYear})")
-                } else if (it.premiereDate != null) {
-                    append(" (${it.premiereDate!!.year})")
-                }
-            }.ifEmpty { null }
-        } ?: sourceInfo.name.orEmpty()
-
         audioStreams = audio
         subtitleStreams = subtitles
         externalSubtitleStreams = externalSubtitles
@@ -192,6 +152,41 @@ sealed class JellyfinMediaSource(
             }
         }
         throw IllegalArgumentException("Invalid media stream")
+    }
+
+    /**
+     * Get the formatted name of the source.
+     */
+    @Suppress("CyclomaticComplexMethod")
+    fun getName(context: Context): String {
+        return item?.let {
+            buildString {
+                val name = if (
+                    it.type in arrayOf(BaseItemKind.PROGRAM, BaseItemKind.RECORDING) &&
+                    (it.isSeries == true || !it.episodeTitle.isNullOrEmpty())
+                ) { it.episodeTitle } else { it.name }
+
+                val specialEpisode = context.getString(R.string.special_episode)
+                val extraInfo = when {
+                    it.type == BaseItemKind.TV_CHANNEL && !it.channelNumber.isNullOrEmpty() -> it.channelNumber
+                    it.type == BaseItemKind.EPISODE && it.parentIndexNumber == 0 -> specialEpisode
+                    it.type in arrayOf(BaseItemKind.EPISODE, BaseItemKind.RECORDING) &&
+                        it.indexNumber != null && it.parentIndexNumber != null ->
+                        "S${it.parentIndexNumber}:E${it.indexNumber}${it.indexNumberEnd?.let { n -> "-$n" } ?: ""}"
+                    else -> ""
+                }
+
+                listOf(it.seriesName, extraInfo, name)
+                    .filter { str -> !str.isNullOrEmpty() }
+                    .joinTo(this, separator = " - ")
+
+                if (it.type == BaseItemKind.MOVIE && it.productionYear != null) {
+                    append(" (${it.productionYear})")
+                } else if (it.premiereDate != null) {
+                    append(" (${it.premiereDate!!.year})")
+                }
+            }.ifEmpty { null }
+        } ?: sourceInfo.name.orEmpty()
     }
 }
 
