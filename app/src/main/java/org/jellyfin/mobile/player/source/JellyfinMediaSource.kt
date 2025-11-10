@@ -158,35 +158,39 @@ sealed class JellyfinMediaSource(
      * Get the formatted name of the source.
      */
     @Suppress("CyclomaticComplexMethod")
-    fun getName(context: Context): String {
-        return item?.let {
-            buildString {
-                val name = if (
-                    it.type in arrayOf(BaseItemKind.PROGRAM, BaseItemKind.RECORDING) &&
-                    (it.isSeries == true || !it.episodeTitle.isNullOrEmpty())
-                ) { it.episodeTitle } else { it.name }
+    fun getName(context: Context?): String {
+        if (context != null && item != null) {
+            val sb = StringBuilder()
 
-                val specialEpisode = context.getString(R.string.special_episode)
-                val extraInfo = when {
-                    it.type == BaseItemKind.TV_CHANNEL && !it.channelNumber.isNullOrEmpty() -> it.channelNumber
-                    it.type == BaseItemKind.EPISODE && it.parentIndexNumber == 0 -> specialEpisode
-                    it.type in arrayOf(BaseItemKind.EPISODE, BaseItemKind.RECORDING) &&
-                        it.indexNumber != null && it.parentIndexNumber != null ->
-                        "S${it.parentIndexNumber}:E${it.indexNumber}${it.indexNumberEnd?.let { n -> "-$n" } ?: ""}"
-                    else -> ""
-                }
+            val name = if (
+                item.type in arrayOf(BaseItemKind.PROGRAM, BaseItemKind.RECORDING) &&
+                (item.isSeries == true || !item.episodeTitle.isNullOrEmpty())
+            ) { item.episodeTitle } else { item.name }
 
-                listOf(it.seriesName, extraInfo, name)
-                    .filter { str -> !str.isNullOrEmpty() }
-                    .joinTo(this, separator = " - ")
+            val specialEpisode = context.getString(R.string.special_episode)
+            val extraInfo = when {
+                item.type == BaseItemKind.TV_CHANNEL && !item.channelNumber.isNullOrEmpty() -> item.channelNumber
+                item.type == BaseItemKind.EPISODE && item.parentIndexNumber == 0 -> specialEpisode
+                item.type in arrayOf(BaseItemKind.EPISODE, BaseItemKind.RECORDING) &&
+                    item.indexNumber != null && item.parentIndexNumber != null ->
+                    "S${item.parentIndexNumber}:E${item.indexNumber}${item.indexNumberEnd?.let { n -> "-$n" } ?: ""}"
+                else -> ""
+            }
 
-                if (it.type == BaseItemKind.MOVIE && it.productionYear != null) {
-                    append(" (${it.productionYear})")
-                } else if (it.premiereDate != null) {
-                    append(" (${it.premiereDate!!.year})")
-                }
-            }.ifEmpty { null }
-        } ?: sourceInfo.name.orEmpty()
+            listOf(item.seriesName, extraInfo, name)
+                .filter { str -> !str.isNullOrEmpty() }
+                .joinTo(sb, separator = " - ")
+
+            if (item.type == BaseItemKind.MOVIE && item.productionYear != null) {
+                sb.append(" (${item.productionYear})")
+            } else if (item.premiereDate != null) {
+                sb.append(" (${item.premiereDate!!.year})")
+            }
+
+            return sb.toString().ifEmpty { sourceInfo.name.orEmpty() }
+        } else {
+            return item?.name ?: sourceInfo.name.orEmpty()
+        }
     }
 }
 
