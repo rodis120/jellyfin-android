@@ -348,13 +348,13 @@ class PlayerMenus(
                     setPlaybackSpeed(newSpeed)
                 }
 
-                binding.minusHalfButton.setOnClickListener {
-                    val newSpeed = max(playbackParameters.speed-0.5f, SPEED_MENU_MIN_SPEED)
+                binding.minusStepButton.setOnClickListener {
+                    val newSpeed = max(playbackParameters.speed-SPEED_MENU_STEP_SIZE, SPEED_MENU_MIN_SPEED)
                     setPlaybackSpeed(newSpeed)
                 }
 
-                binding.plusHalfButton.setOnClickListener {
-                    setPlaybackSpeed(playbackParameters.speed+0.5f)
+                binding.plusStepButton.setOnClickListener {
+                    setPlaybackSpeed(playbackParameters.speed+SPEED_MENU_STEP_SIZE)
                 }
 
                 binding.plusOneButton.setOnClickListener {
