@@ -1,11 +1,15 @@
 package org.jellyfin.mobile.player.ui
 
+import android.content.Context
+import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.PopupMenu
+import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.widget.AppCompatImageView
@@ -15,31 +19,39 @@ import androidx.core.view.get
 import androidx.core.view.isVisible
 import androidx.core.view.size
 import androidx.core.view.updateLayoutParams
+import androidx.core.widget.addTextChangedListener
+import androidx.media3.common.PlaybackParameters
+import androidx.media3.common.Player
 import androidx.media3.ui.DefaultTimeBar
 import androidx.media3.ui.TimeBar
 import org.jellyfin.mobile.R
 import org.jellyfin.mobile.databinding.ExoPlayerControlViewBinding
+import org.jellyfin.mobile.databinding.ExoPlayerSpeedControlMenuBinding
 import org.jellyfin.mobile.databinding.FragmentPlayerBinding
+import org.jellyfin.mobile.player.PlayerViewModel
 import org.jellyfin.mobile.player.qualityoptions.QualityOptionsProvider
 import org.jellyfin.mobile.player.source.JellyfinMediaSource
 import org.jellyfin.mobile.player.source.LocalJellyfinMediaSource
 import org.jellyfin.mobile.player.source.RemoteJellyfinMediaSource
 import org.jellyfin.mobile.player.ui.playermenuhelper.PlayerMenuHelper
 import org.jellyfin.mobile.player.ui.playermenuhelper.SkipMediaSegmentButton
+import org.jellyfin.mobile.utils.AndroidVersion
 import org.jellyfin.sdk.model.api.ChapterInfo
 import org.jellyfin.sdk.model.api.MediaStream
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.Locale
+import kotlin.math.max
 
 /**
  *  Provides a menu UI for audio, subtitle and video stream selection
  */
 class PlayerMenus(
     private val fragment: PlayerFragment,
+    private val viewModel: PlayerViewModel,
     private val playerBinding: FragmentPlayerBinding,
     private val playerControlsBinding: ExoPlayerControlViewBinding,
-) : PopupMenu.OnDismissListener,
+) : PopupMenu.OnDismissListener, PopupWindow.OnDismissListener,
     KoinComponent {
 
     private val context = playerBinding.root.context
@@ -59,7 +71,7 @@ class PlayerMenus(
     private val playbackInfo: TextView by playerBinding::playbackInfo
     private val audioStreamsMenu: PopupMenu = createAudioStreamsMenu()
     private val subtitlesMenu: PopupMenu = createSubtitlesMenu()
-    private val speedMenu: PopupMenu = createSpeedMenu()
+    private val speedMenu: PopupWindow = createSpeedMenu()
     private val qualityMenu: PopupMenu = createQualityMenu()
     private val decoderMenu: PopupMenu = createDecoderMenu()
     private val chapterMarkingContainer: ConstraintLayout by playerControlsBinding::chapterMarkingContainer
@@ -133,7 +145,8 @@ class PlayerMenus(
         }
         speedButton.setOnClickListener {
             fragment.suppressControllerAutoHide(true)
-            speedMenu.show()
+            val offset = -speedMenu.contentView.measuredHeight-speedButton.height
+            speedMenu.showAsDropDown(speedButton, 0, offset)
         }
         qualityButton.setOnClickListener {
             fragment.suppressControllerAutoHide(true)
@@ -301,17 +314,71 @@ class PlayerMenus(
         setOnDismissListener(this@PlayerMenus)
     }
 
-    private fun createSpeedMenu() = PopupMenu(context, speedButton).apply {
-        for (step in SPEED_MENU_STEP_MIN..SPEED_MENU_STEP_MAX) {
-            val newSpeed = step * SPEED_MENU_STEP_SIZE
-            menu.add(SPEED_MENU_GROUP, step, Menu.NONE, "${newSpeed}x").isChecked = newSpeed == 1f
-        }
-        menu.setGroupCheckable(SPEED_MENU_GROUP, true, true)
-        setOnMenuItemClickListener { clickedItem: MenuItem ->
-            fragment.onSpeedSelected(clickedItem.itemId * SPEED_MENU_STEP_SIZE).also { success ->
-                if (success) clickedItem.isChecked = true
+    private fun createSpeedMenu() = PopupWindow(context).apply {
+        val inflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
+        contentView = inflater.inflate(R.layout.exo_player_speed_control_menu, null, false)
+
+        isFocusable = true
+
+        viewModel.player.observe(fragment) { player ->
+            player?.apply {
+                val binding = ExoPlayerSpeedControlMenuBinding.bind(contentView)
+
+                val updateCurrentSpeed = {
+                    binding.currentSpeed.text.clear()
+                    binding.currentSpeed.text.append("%.2f".format(playbackParameters.speed))
+                }
+
+                updateCurrentSpeed()
+
+                binding.currentSpeed.addTextChangedListener { text ->
+                    try {
+                        setPlaybackSpeed(max(text.toString().toFloat(), SPEED_MENU_MIN_SPEED))
+                    } catch(e: Exception) {}
+                }
+
+                addListener(object : Player.Listener {
+                    override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+                        updateCurrentSpeed()
+                    }
+                })
+
+                binding.minusOneButton.setOnClickListener {
+                    val newSpeed = max(playbackParameters.speed-1.0f, SPEED_MENU_MIN_SPEED)
+                    setPlaybackSpeed(newSpeed)
+                }
+
+                binding.minusHalfButton.setOnClickListener {
+                    val newSpeed = max(playbackParameters.speed-0.5f, SPEED_MENU_MIN_SPEED)
+                    setPlaybackSpeed(newSpeed)
+                }
+
+                binding.plusHalfButton.setOnClickListener {
+                    setPlaybackSpeed(playbackParameters.speed+0.5f)
+                }
+
+                binding.plusOneButton.setOnClickListener {
+                    setPlaybackSpeed(playbackParameters.speed+1.0f)
+                }
+
+                val buttonSize = (context.resources.displayMetrics.density * 55 + 0.5f).toInt()
+                for (step in SPEED_MENU_STEP_MIN..SPEED_MENU_STEP_MAX) {
+                    val speed = step * SPEED_MENU_STEP_SIZE
+                    Button(context).apply {
+                        text = speed.toString()
+                        layoutParams = ViewGroup.LayoutParams(buttonSize, buttonSize)
+                        setOnClickListener {
+                            setPlaybackSpeed(speed)
+                        }
+
+                        binding.presets.addView(this)
+                    }
+                }
+
+                contentView.measure(4000, 4000)
             }
         }
+
         setOnDismissListener(this@PlayerMenus)
     }
 
@@ -406,9 +473,13 @@ class PlayerMenus(
         playbackInfo.isVisible = false
     }
 
-    override fun onDismiss(menu: PopupMenu) {
+    override fun onDismiss() {
         fragment.suppressControllerAutoHide(false)
         fragment.onPopupDismissed()
+    }
+
+    override fun onDismiss(menu: PopupMenu) {
+        this.onDismiss()
     }
 
     private fun formatBitrate(bitrate: Double): String {
@@ -426,9 +497,8 @@ class PlayerMenus(
     companion object {
         private const val SUBTITLES_MENU_GROUP = 0
         private const val AUDIO_MENU_GROUP = 1
-        private const val SPEED_MENU_GROUP = 2
-        private const val QUALITY_MENU_GROUP = 3
-        private const val DECODER_MENU_GROUP = 4
+        private const val QUALITY_MENU_GROUP = 2
+        private const val DECODER_MENU_GROUP = 3
 
         private const val MAX_VIDEO_STREAMS_DISPLAY = 3
         private const val MAX_AUDIO_STREAMS_DISPLAY = 5
@@ -437,7 +507,8 @@ class PlayerMenus(
         private const val BITRATE_KILO_BIT = 1_000
 
         private const val SPEED_MENU_STEP_SIZE = 0.25f
-        private const val SPEED_MENU_STEP_MIN = 2 // → 0.5x
+        private const val SPEED_MENU_STEP_MIN = 1 // → 0.25x
         private const val SPEED_MENU_STEP_MAX = 8 // → 2x
+        private const val SPEED_MENU_MIN_SPEED = 0.1f
     }
 }

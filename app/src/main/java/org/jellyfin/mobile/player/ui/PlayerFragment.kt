@@ -206,7 +206,7 @@ class PlayerFragment : Fragment(), BackPressInterceptor {
         toolbar.setNavigationOnClickListener { parentFragmentManager.popBackStack() }
 
         // Create playback menus
-        playerMenus = PlayerMenus(this, playerBinding, playerControlsBinding)
+        playerMenus = PlayerMenus(this, viewModel, playerBinding, playerControlsBinding)
 
         // Set controller timeout
         suppressControllerAutoHide(false)
@@ -340,13 +340,6 @@ class PlayerFragment : Fragment(), BackPressInterceptor {
 
     fun onBitrateChanged(bitrate: Int?, callback: TrackSelectionCallback) = lifecycleScope.launch {
         callback.onTrackSelected(viewModel.changeBitrate(bitrate))
-    }
-
-    /**
-     * @return true if the playback speed was changed
-     */
-    fun onSpeedSelected(speed: Float): Boolean {
-        return viewModel.setPlaybackSpeed(speed)
     }
 
     fun onPressSpeedUp(isPressing: Boolean): Boolean {
